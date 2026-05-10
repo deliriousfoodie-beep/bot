@@ -23,6 +23,7 @@ name: Run Trading Bot
           DISCORD_TOKEN: ${{ secrets.DISCORD_TOKEN }}
           CHANNEL_ID: ${{ secrets.CHANNEL_ID }} # Add this line
         run: python topgainers.py
+        run: python volume.py
     ```
 
 ### How to test if you did it right:
