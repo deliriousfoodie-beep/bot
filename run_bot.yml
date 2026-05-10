@@ -21,7 +21,7 @@ name: Run Trading Bot
         env:
           DISCORD_TOKEN: ${{ secrets.DISCORD_TOKEN }}
           CHANNEL_ID: ${{ secrets.CHANNEL_ID }} # Add this line
-        run: python bot.py
+        run: python topgainers.py
     ```
 
 ### How to test if you did it right:
