@@ -1,7 +1,8 @@
 name: Run Trading Bot
     on:
       schedule:
-        - cron: '0 13 * * 1-5' # Runs at 9am ET, Mon-Fri
+# 13:31 UTC is 6:31 AM PST
+    - cron: '31 13 * * 1-5'
       workflow_dispatch:      # Lets you run it manually with a button
     
     jobs:
