@@ -52,7 +52,7 @@ async def get_tradingview_gainers():
                 if not ticker_match: continue
                 ticker = ticker_match.group()
 
-                # 2. Extract the Top Gainers Percentage Change
+                # 2. Extract the Usual Volume Percentage Change
                 # Looks for + or - followed by digits and a % sign
                 chg_match = re.search(r'([+-−][0-9.]+\%)', row_text)
                 change = chg_match.group(1) if chg_match else "N/A"
