@@ -17,10 +17,11 @@ name: Run Trading Bot
             run: |
               pip install -r requirements.txt
               playwright install chromium --with-deps
-          - name: Run Bot
-            env:
-              DISCORD_TOKEN: ${{ secrets.DISCORD_TOKEN }}
-            run: python bot.py
+- name: Run Bot
+        env:
+          DISCORD_TOKEN: ${{ secrets.DISCORD_TOKEN }}
+          CHANNEL_ID: ${{ secrets.CHANNEL_ID }} # Add this line
+        run: python bot.py
     ```
 
 ### How to test if you did it right:
