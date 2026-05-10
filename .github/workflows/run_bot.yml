@@ -1,0 +1,28 @@
+name: Run Trading Bot
+    on:
+      schedule:
+# 13:31 UTC is 6:31 AM PST
+    - cron: '31 13 * * 1-5'
+      workflow_dispatch:      # Lets you run it manually with a button
+    
+    jobs:
+      build:
+        runs-on: ubuntu-latest
+        steps:
+          - uses: actions/checkout@v4
+          - name: Set up Python
+            uses: actions/setup-python@v5
+            with:
+              python-version: '3.10'
+          - name: Install dependencies
+            run: |
+              pip install -r requirements.txt
+              playwright install chromium --with-deps
+          - name: Run Bot
+            env:
+              DISCORD_TOKEN: ${{ secrets.DISCORD_TOKEN }}
+            run: python bot.py
+    ```
+
+### How to test if you did it right:
+Go to the **Actions** tab at the top of your GitHub page. Click on **Run Trading Bot** on the left, then click the **Run workflow** button. If you see a green checkmark after a minute or two, check your Discord—the list should be there!
