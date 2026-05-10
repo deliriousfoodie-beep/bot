@@ -21,9 +21,10 @@ jobs:
           pip install -r requirements.txt
           playwright install chromium --with-deps
 
-      - name: Run Bot
+- name: Run All Scripts
         env:
           DISCORD_TOKEN: ${{ secrets.DISCORD_TOKEN }}
           CHANNEL_ID: ${{ secrets.CHANNEL_ID }}
-        run: python topgainers.py
-        run: python volume.py
+        run: |
+          python topgainers.py
+          python premarket.py
