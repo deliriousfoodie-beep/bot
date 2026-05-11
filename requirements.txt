@@ -1,2 +1,4 @@
 playwright
 discord.py
+yfinance
+pandas
