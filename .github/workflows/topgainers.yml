@@ -30,4 +30,5 @@ jobs:
           python topgainers.py
           python volume.py
           python heatmap.py
-          pythong earnings.py
+          python earnings.py
+          python vix.py
