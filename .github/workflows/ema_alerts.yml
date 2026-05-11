@@ -1,0 +1,32 @@
+name: AIRS EMA Alert System
+
+on:
+  schedule:
+    # This runs every hour at the top of the hour, Monday through Friday
+    # 14:00 to 21:00 UTC covers the standard US Market hours
+    - cron: '0 14-21 * * 1-5'
+  workflow_dispatch: # This allows you to run it manually to test
+
+jobs:
+  check-ema:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install Dependencies
+        run: |
+          pip install yfinance pandas
+
+      - name: Run EMA Monitor
+        env:
+          # This connects your GitHub Secrets to the Python script
+          EMAIL_USER: ${{ secrets.EMAIL_USER }}
+          EMAIL_PASS: ${{ secrets.EMAIL_PASS }}
+          RECEIVER_EMAIL: ${{ secrets.RECEIVER_EMAIL }}
+        run: python ema_monitor.py
