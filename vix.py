@@ -12,50 +12,45 @@ client = discord.Client(intents=intents)
 
 async def capture_fear_greed():
     async with async_playwright() as p:
+        # Launching headless for GitHub Actions
         browser = await p.chromium.launch(headless=True)
-        context = await browser.new_context(viewport={'width': 1280, 'height': 1800})
+        # Use a high device scale factor for a crisp image
+        context = await browser.new_context(
+            viewport={'width': 1280, 'height': 1200},
+            device_scale_factor=2
+        )
         page = await context.new_page()
         
-        print("🚀 Opening CNN Fear & Greed Index...")
-        url = "https://www.cnn.com/markets/fear-and-greed"
+        print("🚀 Opening FearGreedMeter.com...")
+        url = "https://feargreedmeter.com/fear-and-greed-index"
         
         try:
-            # 1. Wait for the page to be quiet
+            # 1. Navigate to the new URL
             await page.goto(url, wait_until="networkidle", timeout=60000)
             
-            # 2. THE NUCLEAR OPTION (Restored)
-            # This is the exact CSS block that cleared the banner for you before.
+            # 2. Clean up any ads or banners that might block the view
+            # This site is cleaner, but we'll still scrub common junk
             await page.add_style_tag(content="""
-                #onetrust-consent-sdk, #onetrust-banner-sdk, .onetrust-pc-dark-filter { 
+                ins, .ad-container, #google_ads_iframe, .banner-ad { 
                     display: none !important; 
                 }
-                /* Hide everything that might overlap the content */
-                div[role="dialog"], div[class*="overlay"], div[class*="modal"] {
-                    display: none !important;
-                }
-                /* Force brightness and visibility */
-                html, body { 
-                    filter: none !important; 
-                    background-color: white !important; 
-                    overflow: visible !important;
-                }
+                /* Ensure background is clean */
+                html, body { background-color: white !important; }
             """)
             
-            # 3. Scroll to trigger animations and reach the Momentum chart
-            # Scrolling 450px as requested earlier for the 15% drop
-            await page.evaluate("window.scrollBy(0, 450)")
-            
-            print("⏳ Rendering charts (sequential mode)...")
-            # Extra sleep to ensure the "White Box" doesn't happen during high workflow load
-            await asyncio.sleep(12) 
+            # 3. Short wait for the specific meter animation to finish
+            print("⏳ Finalizing render...")
+            await asyncio.sleep(7) 
             
             path = "fear_greed.png"
             
-            # 4. Use the coordinate-based clip to capture both Dial and Momentum
-            # This avoids the banner even if a tiny piece of it is still floating elsewhere
-            await page.screenshot(path=path, clip={'x': 0, 'y': 250, 'width': 1280, 'height': 1300})
+            # 4. Target the specific meter section
+            # On this site, the meter is usually inside a container with a class like 'gauge-container' 
+            # but we will use a clip to get a clean, wide shot of the top section.
+            # Start at y=100 to skip any top-nav bars.
+            await page.screenshot(path=path, clip={'x': 0, 'y': 100, 'width': 1280, 'height': 850})
             
-            print("✅ Fear & Greed captured (Banner Scrubbed).")
+            print("✅ Captured FearGreedMeter successfully.")
             await browser.close()
             return path
             
@@ -73,11 +68,12 @@ async def on_ready():
         image_path = await capture_fear_greed()
         if image_path:
             with open(image_path, "rb") as f:
-                title = "📈 [**Fear & Greed Index**](https://www.cnn.com/markets/fear-and-greed)"
+                # Updated link for the Discord title
+                title = "📈 [**Fear & Greed Meter**](https://feargreedmeter.com/fear-and-greed-index)"
                 await channel.send(title, file=discord.File(f), suppress_embeds=True)
             os.remove(image_path)
         else:
-            await channel.send("❌ Failed to capture the Fear & Greed Index.")
+            await channel.send("❌ Failed to capture the Fear & Greed Meter.")
     await client.close()
 
 if __name__ == "__main__":
