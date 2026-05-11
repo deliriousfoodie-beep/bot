@@ -18,11 +18,13 @@ jobs:
         with:
           python-version: '3.10'
 
+      # Line 20 starts here
       - name: Install dependencies
         run: |
           pip install -r requirements.txt
           playwright install chromium --with-deps
-- name: Run After-Hours
+
+      - name: Run After-Hours
         env:
           DISCORD_TOKEN: ${{ secrets.DISCORD_TOKEN }}
           CHANNEL_ID: ${{ secrets.CHANNEL_ID }}
