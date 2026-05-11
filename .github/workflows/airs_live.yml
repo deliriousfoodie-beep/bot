@@ -1,9 +1,8 @@
 name: AIRS Live EMA Monitor
 
 on:
-  schedule:
-    # Runs every 5 minutes from 13:30 to 20:00 UTC (6:30 AM - 1:00 PM PST)
-    - cron: '*/5 13-20 * * 1-5'
+  # schedule:
+  #   - cron: '*/5 13-20 * * 1-5'
   workflow_dispatch:
 
 jobs:
