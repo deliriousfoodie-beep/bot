@@ -27,8 +27,9 @@ jobs:
           DISCORD_TOKEN: ${{ secrets.DISCORD_TOKEN }}
           CHANNEL_ID: ${{ secrets.CHANNEL_ID }}
         run: |
+          python spy.py
+          python heatmap.py
           python topgainers.py
           python volume.py
-          python heatmap.py
           python earnings.py
           python vix.py
