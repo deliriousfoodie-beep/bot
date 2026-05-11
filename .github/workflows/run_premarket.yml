@@ -1,8 +1,7 @@
 name: Run Premarket Bot
 on:
-  schedule:
-    # 12:30 UTC is 5:30 AM PST
-    - cron: '30 12 * * 1-5'
+schedule:
+  - cron: '15 13 * * 1-5'
   workflow_dispatch:
 
 jobs:
