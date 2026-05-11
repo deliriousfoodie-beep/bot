@@ -8,52 +8,63 @@ import os
 TICKER = "AIRS"
 EMA_PERIODS = [10, 20, 50, 200]
 
-# These now pull from GitHub Secrets for security
+# These pull from GitHub Secrets
 EMAIL_ADDRESS = os.getenv("EMAIL_USER")
 EMAIL_PASSWORD = os.getenv("EMAIL_PASS") 
 RECEIVER_EMAIL = os.getenv("RECEIVER_EMAIL")
 
 def check_ema_cross():
-    # We fetch 2y to ensure the 200 EMA is calculated correctly from the start
-data = yf.download(TICKER, period="2y", interval="1d")
+    # 1. Fetch data
+    print(f"🔍 Checking {TICKER}...")
+    data = yf.download(TICKER, period="2y", interval="1d")
     
-    # SAFETY CHECK: If no data, stop here instead of crashing
+    # 2. SAFETY CHECK: If no data, stop here instead of crashing
     if data is None or len(data) < 200:
         print(f"📉 Not enough data for {TICKER} (Market might be closed).")
         return
 
-    # current_price is today's latest close/price
-    current_price = data['Close'].iloc[-1]
+    # 3. Get current price and handle potential multi-index issues
+    # We use .item() to ensure we get a single float value
+    current_price = float(data['Close'].iloc[-1])
     
     alerts = []
     
     for period in EMA_PERIODS:
-        # Calculate EMA using the standard 'ewm' method
+        # Calculate EMA
         ema = data['Close'].ewm(span=period, adjust=False).mean()
-        latest_ema = ema.iloc[-1]
-        previous_ema = ema.iloc[-2]
-        previous_price = data['Close'].iloc[-2]
+        latest_ema = float(ema.iloc[-1])
+        previous_ema = float(ema.iloc[-2])
+        previous_price = float(data['Close'].iloc[-2])
 
         # LOGIC: Price was ABOVE yesterday, now it is BELOW today
         if previous_price > previous_ema and current_price < latest_ema:
             alerts.append(f"⚠️ {TICKER} broke BELOW the {period} EMA!\nPrice: ${current_price:.2f} | EMA: ${latest_ema:.2f}")
 
+    # 4. Action
     if alerts:
         send_email("\n\n".join(alerts))
     else:
-        print("✅ No new EMA breakdowns detected.")
+        print(f"✅ {TICKER} at ${current_price:.2f} is above your EMA levels. No alerts.")
 
 def send_email(content):
+    # If secrets are missing, don't try to send
+    if not EMAIL_ADDRESS or not EMAIL_PASSWORD:
+        print("❌ Error: Email credentials missing in GitHub Secrets.")
+        return
+
     msg = EmailMessage()
     msg.set_content(content)
     msg['Subject'] = f"🚨 AIRS Technical Alert: EMA Breakdown"
     msg['From'] = EMAIL_ADDRESS
     msg['To'] = RECEIVER_EMAIL
 
-    with smtplib.SMTP_SSL('smtp.gmail.com', 465) as smtp:
-        smtp.login(EMAIL_ADDRESS, EMAIL_PASSWORD)
-        smtp.send_message(msg)
-        print("📧 Alert email sent to your inbox.")
+    try:
+        with smtplib.SMTP_SSL('smtp.gmail.com', 465) as smtp:
+            smtp.login(EMAIL_ADDRESS, EMAIL_PASSWORD)
+            smtp.send_message(msg)
+            print("📧 Alert email sent to your inbox.")
+    except Exception as e:
+        print(f"❌ Failed to send email: {e}")
 
 if __name__ == "__main__":
     check_ema_cross()
