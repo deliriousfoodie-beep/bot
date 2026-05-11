@@ -2,14 +2,15 @@ name: AIRS EMA Alert System
 
 on:
   schedule:
-    # This runs every hour at the top of the hour, Monday through Friday
-    # 14:00 to 21:00 UTC covers the standard US Market hours
     - cron: '0 14-21 * * 1-5'
-  workflow_dispatch: # This allows you to run it manually to test
+  workflow_dispatch: 
 
 jobs:
   check-ema:
     runs-on: ubuntu-latest
+    env:
+      # This clears the "Node.js 20" warning you saw
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
@@ -25,8 +26,8 @@ jobs:
 
       - name: Run EMA Monitor
         env:
-          # This connects your GitHub Secrets to the Python script
           EMAIL_USER: ${{ secrets.EMAIL_USER }}
           EMAIL_PASS: ${{ secrets.EMAIL_PASS }}
           RECEIVER_EMAIL: ${{ secrets.RECEIVER_EMAIL }}
+        # Adding '|| exit 1' ensures we catch the exact python error
         run: python ema_monitor.py
