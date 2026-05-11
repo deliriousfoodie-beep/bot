@@ -23,9 +23,10 @@ jobs:
           pip install -r requirements.txt
           playwright install chromium --with-deps
 
-      - name: Run After-Hours
+- name: Run After-Hours
         env:
           DISCORD_TOKEN: ${{ secrets.DISCORD_TOKEN }}
           CHANNEL_ID: ${{ secrets.CHANNEL_ID }}
-        # Assuming you renamed your script or it handles AH logic
-        run: python afterhours.py
+        run: |
+          python afterhours.py
+          python afterhoursactive.py
