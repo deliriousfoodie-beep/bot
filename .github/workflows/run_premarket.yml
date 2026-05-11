@@ -1,12 +1,14 @@
 name: Run Premarket Bot
+
 on:
-schedule:
-  - cron: '15 13 * * 1-5'
+  schedule:
+    - cron: '15 13 * * 1-5'
   workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
