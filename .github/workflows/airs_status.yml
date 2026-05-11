@@ -23,7 +23,7 @@ jobs:
       - name: Install Dependencies
         run: pip install yfinance pandas discord.py
 
-- name: Run AIRS Report
+      - name: Run AIRS Report
         env:
           DISCORD_TOKEN: ${{ secrets.DISCORD_TOKEN }}
           MY_DISCORD_USER_ID: ${{ secrets.MY_DISCORD_USER_ID }}
