@@ -15,9 +15,11 @@ RECEIVER_EMAIL = os.getenv("RECEIVER_EMAIL")
 
 def check_ema_cross():
     # We fetch 2y to ensure the 200 EMA is calculated correctly from the start
-    data = yf.download(TICKER, period="2y", interval="1d")
-    if data.empty:
-        print("❌ No data found.")
+data = yf.download(TICKER, period="2y", interval="1d")
+    
+    # SAFETY CHECK: If no data, stop here instead of crashing
+    if data is None or len(data) < 200:
+        print(f"📉 Not enough data for {TICKER} (Market might be closed).")
         return
 
     # current_price is today's latest close/price
