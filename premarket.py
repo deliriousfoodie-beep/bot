@@ -19,69 +19,81 @@ async def get_tradingview_gainers():
         
         try:
             context = await p.chromium.launch_persistent_context(
-                user_data_dir,
-                headless=True,
-                **device_config,
+                user_data_dir, headless=True, **device_config
             )
             page = context.pages[0]
             await page.add_init_script("delete Object.getPrototypeOf(navigator).webdriver")
             
-            print("Fetching and cleaning TradingView data...")
             url = "https://www.tradingview.com/markets/stocks-usa/market-movers-pre-market-gainers/"
             await page.goto(url, wait_until="load")
             
+            # Wait for rows and scroll more to ensure 100 rows are loaded in the DOM
             await page.wait_for_selector("tbody tr", timeout=30000)
-            await page.evaluate("window.scrollBy(0, 500)")
-            await asyncio.sleep(4) 
+            await page.evaluate("window.scrollBy(0, 2000)")
+            await asyncio.sleep(5) 
 
             rows = await page.query_selector_all("tbody tr")
 
-            bt = chr(96) * 3
-            res = ["🚀 **PRE-MARKET GAINERS**", bt + "text"]
-            res.append(f"{'TICKER':<8} | {'PRICE':<10} | {'PRE-CHG'}")
-            res.append("-" * 34)
+            all_messages = []
+            # Starting Header
+            current_chunk = ["🚀 [**Pre-Market Gainers**](https://www.tradingview.com/markets/stocks-usa/market-movers-pre-market-gainers/)", ""]
+            current_chunk.append("**TICKER | PRICE | GAINS**")
+            current_chunk.append("------------------------------")
 
             count = 0
             for row in rows:
-                if count >= 55: break
+                if count >= 100: break # Increased limit to 100
                 
                 row_text = await row.inner_text()
-                
-                # 1. Get the Ticker (Usually the first word in the block)
                 ticker_match = re.search(r'^[A-Z]+', row_text.strip())
                 if not ticker_match: continue
                 ticker = ticker_match.group()
 
-                # 2. Extract the Pre-Market Percentage Change
-                # Looks for + or - followed by digits and a % sign
                 chg_match = re.search(r'([+-−][0-9.]+\%)', row_text)
                 change = chg_match.group(1) if chg_match else "N/A"
 
-                # 3. Extract the Price
-                # Looks for digits + '.' + digits followed by 'USD'
-                # Example: '0.99 USD' -> '0.99'
                 price_match = re.search(r'([0-9.]+) USD', row_text)
                 price = f"${price_match.group(1)}" if price_match else "N/A"
 
                 if ticker and change != "N/A":
-                    res.append(f"{ticker:<8} | {price:<10} | {change}")
+                    ticker_link = f"[{ticker}](https://www.tradingview.com/chart/?symbol={ticker})"
+                    line = f"{ticker_link} | {price} | {change}"
+                    
+                    # Calculate current length including newlines
+                    current_length = len("\n".join(current_chunk))
+                    
+                    # If adding this line hits ~1800 chars, ship the current chunk
+                    if current_length + len(line) > 1800:
+                        all_messages.append("\n".join(current_chunk))
+                        # Start new chunk without the header (to save space)
+                        current_chunk = [line] 
+                    else:
+                        current_chunk.append(line)
+                    
                     count += 1
 
-            res.append(bt)
+            # Add the final leftover chunk
+            if current_chunk:
+                all_messages.append("\n".join(current_chunk))
+
             await context.close()
-            return "\n".join(res) if count > 0 else "⚠️ Could not parse clean data."
+            return all_messages
             
         except Exception as e:
-            return f"❌ Error: {str(e)}"
+            return [f"❌ Error: {str(e)}"]
 
 @client.event
 async def on_ready():
     print(f"Logged in as {client.user}")
     channel = client.get_channel(CHANNEL_ID)
     if channel:
-        report = await get_tradingview_gainers()
-        await channel.send(report)
-        print("Success.")
+        reports = await get_tradingview_gainers()
+        for i, msg in enumerate(reports):
+            # Suppress embeds and send chunks
+            await channel.send(msg, suppress_embeds=True)
+            # Short sleep to prevent Discord from rate-limiting or re-ordering
+            await asyncio.sleep(1.5) 
+        print(f"Success: Sent {len(reports)} message(s).")
     await client.close()
 
 if __name__ == "__main__":
