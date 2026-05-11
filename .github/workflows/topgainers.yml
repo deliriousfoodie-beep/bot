@@ -29,3 +29,4 @@ jobs:
         run: |
           python topgainers.py
           python volume.py
+          python heatmap.py
