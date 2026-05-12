@@ -7,7 +7,9 @@ import requests
 import re
 from bs4 import BeautifulSoup
 
-# --- CONFIG ---
+# -----------------------------
+# CONFIG
+# -----------------------------
 TICKER = "SPY"
 EMA_PERIODS = [10, 20, 50, 200]
 
@@ -15,121 +17,173 @@ TOKEN = os.getenv("DISCORD_TOKEN")
 CHANNEL_ID = int(os.getenv("CHANNEL_ID"))
 
 # -----------------------------
-# FEAR & GREED SCRAPER
+# SECTOR MAP (tickers → names)
+# -----------------------------
+SECTORS = {
+    "XLK": "Technology",
+    "XLF": "Financials",
+    "XLE": "Energy",
+    "XLV": "Healthcare",
+    "XLI": "Industrials",
+    "XLY": "Consumer Discretionary",
+    "XLP": "Consumer Staples",
+    "XLRE": "Real Estate",
+    "XLU": "Utilities"
+}
+
+# -----------------------------
+# FEAR & GREED
 # -----------------------------
 def get_fear_greed():
     try:
         url = "https://feargreedmeter.com/"
-        headers = {"User-Agent": "Mozilla/5.0"}
-
-        response = requests.get(url, headers=headers, timeout=15)
-        soup = BeautifulSoup(response.text, "html.parser")
+        r = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=15)
+        soup = BeautifulSoup(r.text, "html.parser")
 
         text = soup.get_text(" ", strip=True)
-
-        # extract number 0–100
         matches = re.findall(r'\b([1-9]?\d|100)\b', text)
 
-        value = None
-        for m in matches:
-            num = int(m)
-            if 0 <= num <= 100:
-                value = num
-                break
+        value = next((int(m) for m in matches if 0 <= int(m) <= 100), None)
 
         if value is None:
             return "❌ Fear & Greed not found"
 
-        # sentiment mapping
         if value <= 24:
-            sentiment, emoji = "Extreme Fear", "🔴"
+            return f"🔴 Fear & Greed: {value} (Extreme Fear)"
         elif value <= 44:
-            sentiment, emoji = "Fear", "🟠"
+            return f"🟠 Fear & Greed: {value} (Fear)"
         elif value <= 54:
-            sentiment, emoji = "Neutral", "🟡"
+            return f"🟡 Fear & Greed: {value} (Neutral)"
         elif value <= 74:
-            sentiment, emoji = "Greed", "🟢"
+            return f"🟢 Fear & Greed: {value} (Greed)"
         else:
-            sentiment, emoji = "Extreme Greed", "🚀"
-
-        return f"{emoji} Fear & Greed Index: **{value}** ({sentiment})"
+            return f"🚀 Fear & Greed: {value} (Extreme Greed)"
 
     except Exception as e:
         return f"❌ Fear & Greed error: {e}"
 
 # -----------------------------
-# REPORT GENERATION
+# SECTOR PERFORMANCE
 # -----------------------------
-async def generate_spy_report():
-    print(f"🔍 Fetching data for {TICKER}...")
+def get_sector_leaders():
+    try:
+        results = []
 
-    data = yf.download(TICKER, period="2y", interval="1d")
+        for ticker, name in SECTORS.items():
+            data = yf.download(ticker, period="6d", interval="1d", progress=False)
 
-    if data.empty or len(data) < 200:
-        return "❌ Error: Not enough SPY data."
+            if data.empty:
+                continue
 
-    if isinstance(data.columns, pd.MultiIndex):
-        close = data["Close"][TICKER]
-    else:
-        close = data["Close"]
+            close = data["Close"]
+            change = ((close.iloc[-1] - close.iloc[0]) / close.iloc[0]) * 100
 
+            results.append((name, change))
+
+        results.sort(key=lambda x: x[1], reverse=True)
+
+        lines = ["\n🏆 **Sector Leaders (5D)**"]
+
+        for i, (name, chg) in enumerate(results, 1):
+            emoji = "🟢" if chg > 0 else "🔴"
+            lines.append(f"{i}. {emoji} {name}: {chg:+.2f}%")
+
+        return "\n".join(lines)
+
+    except Exception as e:
+        return f"❌ Sector error: {e}"
+
+# -----------------------------
+# MARKET REGIME ENGINE
+# -----------------------------
+def get_market_regime():
+    try:
+        spy = yf.download("SPY", period="6mo", interval="1d", progress=False)["Close"]
+        vix = yf.download("^VIX", period="1mo", interval="1d", progress=False)["Close"]
+        dxy = yf.download("DX-Y.NYB", period="1mo", interval="1d", progress=False)["Close"]
+
+        spy_trend = spy.ewm(span=50).mean().iloc[-1]
+        price = spy.iloc[-1]
+
+        vix_val = vix.iloc[-1]
+        dxy_val = dxy.iloc[-1]
+
+        score = 0
+
+        # SPY trend
+        if price > spy_trend:
+            score += 1
+        else:
+            score -= 1
+
+        # VIX
+        if vix_val < 18:
+            score += 1
+        elif vix_val > 25:
+            score -= 1
+
+        # DXY (simple proxy)
+        if dxy_val < dxy.rolling(20).mean().iloc[-1]:
+            score += 1
+        else:
+            score -= 1
+
+        if score >= 2:
+            return "🟢 Market Regime: RISK-ON"
+        elif score == 1:
+            return "🟡 Market Regime: NEUTRAL"
+        elif score == 0:
+            return "🟠 Market Regime: MIXED / ROTATION"
+        else:
+            return "🔴 Market Regime: RISK-OFF"
+
+    except Exception as e:
+        return f"❌ Regime error: {e}"
+
+# -----------------------------
+# MAIN REPORT
+# -----------------------------
+async def generate_report():
+    data = yf.download(TICKER, period="2y", interval="1d", progress=False)
+
+    close = data["Close"]
     price = float(close.iloc[-1])
 
     report = [
-        f"📊 **{TICKER} EMA Report** (Price: ${price:.2f})"
+        f"📊 **{TICKER} Market Dashboard** (${price:.2f})"
     ]
 
     for p in EMA_PERIODS:
-        ema = close.ewm(span=p, adjust=False).mean()
-        val = float(ema.iloc[-1])
+        ema = close.ewm(span=p).mean().iloc[-1]
+        status = "🟢 ABOVE" if price > ema else "🔴 BELOW"
+        report.append(f"{status} {p} EMA: ${ema:.2f}")
 
-        status = "🟢 ABOVE" if price > val else "🔴 BELOW"
-        diff = ((price - val) / val) * 100
-
-        report.append(
-            f"{status} **{p} EMA** (${val:.2f}) | {diff:+.2f}%"
-        )
-
-    # -----------------------------
-    # FEAR & GREED
-    # -----------------------------
     report.append("")
     report.append(get_fear_greed())
+    report.append(get_market_regime())
+    report.append(get_sector_leaders())
 
-    # -----------------------------
-    # MARKET LINKS (CLICKABLE TEXT, NO PREVIEWS)
-    # -----------------------------
     report.append("\n🔗 **Market Links**")
-
     report.append("[Top Gainers](https://www.tradingview.com/markets/stocks-usa/market-movers-gainers/)")
     report.append("[Premarket Gainers](https://www.tradingview.com/markets/stocks-usa/market-movers-pre-market-gainers/)")
     report.append("[Unusual Volume](https://www.tradingview.com/markets/stocks-usa/market-movers-unusual-volume/)")
-    report.append("[Fear and Greed Index](https://www.cnn.com/markets/fear-and-greed)")
-    report.append("[Heat Map](https://www.tradingview.com/heatmap/stock/#%7B%22dataSource%22%3A%22SPX500%22%2C%22blockColor%22%3A%22change%22%2C%22blockSize%22%3A%22market_cap_basic%22%2C%22grouping%22%3A%22sector%22%7D)")
-    report.append("[Earnings Calendar](https://finance.yahoo.com/calendar/earnings?guccounter=1)")
 
     return "\n".join(report)
 
 # -----------------------------
-# DISCORD BOT
+# DISCORD
 # -----------------------------
 async def main():
-    report = await generate_spy_report()
+    report = await generate_report()
 
-    intents = discord.Intents.default()
-    client = discord.Client(intents=intents)
+    client = discord.Client(intents=discord.Intents.default())
 
     @client.event
     async def on_ready():
-        print(f"✅ Logged in as {client.user}")
-
         channel = client.get_channel(CHANNEL_ID)
 
         if channel:
             await channel.send(report, suppress_embeds=True)
-            print("✅ Sent report")
-        else:
-            print("❌ Channel not found")
 
         await client.close()
 
