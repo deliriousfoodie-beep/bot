@@ -4,6 +4,7 @@ import discord
 import os
 import asyncio
 import requests
+import re
 
 from bs4 import BeautifulSoup
 
@@ -29,33 +30,45 @@ def get_fear_greed():
 
         soup = BeautifulSoup(response.text, "html.parser")
 
-        # Find all text on page
         text = soup.get_text(" ", strip=True)
 
-        # Try to locate common labels
-        levels = [
-            "Extreme Fear",
-            "Fear",
-            "Neutral",
-            "Greed",
-            "Extreme Greed"
-        ]
-
-        found_level = "Unknown"
-
-        for level in levels:
-            if level in text:
-                found_level = level
-                break
-
-        # Extract first number between 0-100
-        import re
-
+        # Find numbers between 0-100
         matches = re.findall(r'\b([1-9]?\d|100)\b', text)
 
-        value = matches[0] if matches else "N/A"
+        value = None
 
-        return f"😨 Fear & Greed Index: **{value}** ({found_level})"
+        for match in matches:
+            num = int(match)
+
+            if 0 <= num <= 100:
+                value = num
+                break
+
+        if value is None:
+            return "❌ Fear & Greed value not found"
+
+        # Determine sentiment
+        if value <= 24:
+            sentiment = "Extreme Fear"
+            emoji = "🔴"
+
+        elif value <= 44:
+            sentiment = "Fear"
+            emoji = "🟠"
+
+        elif value <= 54:
+            sentiment = "Neutral"
+            emoji = "🟡"
+
+        elif value <= 74:
+            sentiment = "Greed"
+            emoji = "🟢"
+
+        else:
+            sentiment = "Extreme Greed"
+            emoji = "🚀"
+
+        return f"{emoji} Fear & Greed Index: **{value}** ({sentiment})"
 
     except Exception as e:
         return f"❌ Fear & Greed fetch failed: {e}"
@@ -109,7 +122,7 @@ async def generate_spy_report():
     report_lines.append(fear_greed)
 
     # -----------------------------
-    # MARKET LINKS
+    # MARKET LINKS (NO PREVIEWS)
     # -----------------------------
     report_lines.append("\n🔗 **Market Links**")
 
