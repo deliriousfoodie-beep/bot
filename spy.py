@@ -3,6 +3,9 @@ import pandas as pd
 import discord
 import os
 import asyncio
+import requests
+
+from bs4 import BeautifulSoup
 
 # --- CONFIG ---
 TICKER = "SPY"
@@ -11,6 +14,55 @@ EMA_PERIODS = [10, 20, 50, 200]
 TOKEN = os.getenv("DISCORD_TOKEN")
 CHANNEL_ID = int(os.getenv("CHANNEL_ID"))
 
+# -----------------------------
+# FEAR & GREED SCRAPER
+# -----------------------------
+def get_fear_greed():
+    try:
+        url = "https://feargreedmeter.com/"
+
+        headers = {
+            "User-Agent": "Mozilla/5.0"
+        }
+
+        response = requests.get(url, headers=headers, timeout=15)
+
+        soup = BeautifulSoup(response.text, "html.parser")
+
+        # Find all text on page
+        text = soup.get_text(" ", strip=True)
+
+        # Try to locate common labels
+        levels = [
+            "Extreme Fear",
+            "Fear",
+            "Neutral",
+            "Greed",
+            "Extreme Greed"
+        ]
+
+        found_level = "Unknown"
+
+        for level in levels:
+            if level in text:
+                found_level = level
+                break
+
+        # Extract first number between 0-100
+        import re
+
+        matches = re.findall(r'\b([1-9]?\d|100)\b', text)
+
+        value = matches[0] if matches else "N/A"
+
+        return f"😨 Fear & Greed Index: **{value}** ({found_level})"
+
+    except Exception as e:
+        return f"❌ Fear & Greed fetch failed: {e}"
+
+# -----------------------------
+# SPY REPORT
+# -----------------------------
 async def generate_spy_report():
     print(f"🔍 Fetching data for {TICKER}...")
 
@@ -33,9 +85,14 @@ async def generate_spy_report():
 
     for period in EMA_PERIODS:
         ema = close_series.ewm(span=period, adjust=False).mean()
+
         latest_ema = float(ema.iloc[-1])
 
-        status = "🟢 **ABOVE**" if current_price > latest_ema else "🔴 **BELOW**"
+        status = (
+            "🟢 **ABOVE**"
+            if current_price > latest_ema
+            else "🔴 **BELOW**"
+        )
 
         diff = ((current_price - latest_ema) / latest_ema) * 100
 
@@ -43,7 +100,17 @@ async def generate_spy_report():
             f"{status} the **{period} EMA** (${latest_ema:.2f}) | Dist: {diff:+.2f}%"
         )
 
-    # --- MARKET LINKS (NO PREVIEWS) ---
+    # -----------------------------
+    # FEAR & GREED
+    # -----------------------------
+    fear_greed = get_fear_greed()
+
+    report_lines.append("")
+    report_lines.append(fear_greed)
+
+    # -----------------------------
+    # MARKET LINKS
+    # -----------------------------
     report_lines.append("\n🔗 **Market Links**")
 
     report_lines.append(
@@ -72,10 +139,14 @@ async def generate_spy_report():
 
     return "\n".join(report_lines)
 
+# -----------------------------
+# DISCORD BOT
+# -----------------------------
 async def main():
     report = await generate_spy_report()
 
     intents = discord.Intents.default()
+
     client = discord.Client(intents=intents)
 
     @client.event
