@@ -5,7 +5,6 @@ import os
 import asyncio
 import requests
 import re
-
 from bs4 import BeautifulSoup
 
 # --- CONFIG ---
@@ -21,60 +20,45 @@ CHANNEL_ID = int(os.getenv("CHANNEL_ID"))
 def get_fear_greed():
     try:
         url = "https://feargreedmeter.com/"
-
-        headers = {
-            "User-Agent": "Mozilla/5.0"
-        }
+        headers = {"User-Agent": "Mozilla/5.0"}
 
         response = requests.get(url, headers=headers, timeout=15)
-
         soup = BeautifulSoup(response.text, "html.parser")
 
         text = soup.get_text(" ", strip=True)
 
-        # Find numbers between 0-100
+        # extract number 0–100
         matches = re.findall(r'\b([1-9]?\d|100)\b', text)
 
         value = None
-
-        for match in matches:
-            num = int(match)
-
+        for m in matches:
+            num = int(m)
             if 0 <= num <= 100:
                 value = num
                 break
 
         if value is None:
-            return "❌ Fear & Greed value not found"
+            return "❌ Fear & Greed not found"
 
-        # Determine sentiment
+        # sentiment mapping
         if value <= 24:
-            sentiment = "Extreme Fear"
-            emoji = "🔴"
-
+            sentiment, emoji = "Extreme Fear", "🔴"
         elif value <= 44:
-            sentiment = "Fear"
-            emoji = "🟠"
-
+            sentiment, emoji = "Fear", "🟠"
         elif value <= 54:
-            sentiment = "Neutral"
-            emoji = "🟡"
-
+            sentiment, emoji = "Neutral", "🟡"
         elif value <= 74:
-            sentiment = "Greed"
-            emoji = "🟢"
-
+            sentiment, emoji = "Greed", "🟢"
         else:
-            sentiment = "Extreme Greed"
-            emoji = "🚀"
+            sentiment, emoji = "Extreme Greed", "🚀"
 
         return f"{emoji} Fear & Greed Index: **{value}** ({sentiment})"
 
     except Exception as e:
-        return f"❌ Fear & Greed fetch failed: {e}"
+        return f"❌ Fear & Greed error: {e}"
 
 # -----------------------------
-# SPY REPORT
+# REPORT GENERATION
 # -----------------------------
 async def generate_spy_report():
     print(f"🔍 Fetching data for {TICKER}...")
@@ -82,75 +66,49 @@ async def generate_spy_report():
     data = yf.download(TICKER, period="2y", interval="1d")
 
     if data.empty or len(data) < 200:
-        return "❌ Error: Could not fetch enough data for SPY."
+        return "❌ Error: Not enough SPY data."
 
-    # Handle MultiIndex issue
     if isinstance(data.columns, pd.MultiIndex):
-        close_series = data["Close"][TICKER]
+        close = data["Close"][TICKER]
     else:
-        close_series = data["Close"]
+        close = data["Close"]
 
-    current_price = float(close_series.iloc[-1])
+    price = float(close.iloc[-1])
 
-    report_lines = [
-        f"📊 **{TICKER} EMA Status Report** (Price: ${current_price:.2f})"
+    report = [
+        f"📊 **{TICKER} EMA Report** (Price: ${price:.2f})"
     ]
 
-    for period in EMA_PERIODS:
-        ema = close_series.ewm(span=period, adjust=False).mean()
+    for p in EMA_PERIODS:
+        ema = close.ewm(span=p, adjust=False).mean()
+        val = float(ema.iloc[-1])
 
-        latest_ema = float(ema.iloc[-1])
+        status = "🟢 ABOVE" if price > val else "🔴 BELOW"
+        diff = ((price - val) / val) * 100
 
-        status = (
-            "🟢 **ABOVE**"
-            if current_price > latest_ema
-            else "🔴 **BELOW**"
-        )
-
-        diff = ((current_price - latest_ema) / latest_ema) * 100
-
-        report_lines.append(
-            f"{status} the **{period} EMA** (${latest_ema:.2f}) | Dist: {diff:+.2f}%"
+        report.append(
+            f"{status} **{p} EMA** (${val:.2f}) | {diff:+.2f}%"
         )
 
     # -----------------------------
     # FEAR & GREED
     # -----------------------------
-    fear_greed = get_fear_greed()
-
-    report_lines.append("")
-    report_lines.append(fear_greed)
+    report.append("")
+    report.append(get_fear_greed())
 
     # -----------------------------
-    # MARKET LINKS (NO PREVIEWS)
+    # MARKET LINKS (CLICKABLE TEXT, NO PREVIEWS)
     # -----------------------------
-    report_lines.append("\n🔗 **Market Links**")
+    report.append("\n🔗 **Market Links**")
 
-    report_lines.append(
-        "📈 Top Gainers: <https://www.tradingview.com/markets/stocks-usa/market-movers-gainers/>"
-    )
+    report.append("[Top Gainers](https://www.tradingview.com/markets/stocks-usa/market-movers-gainers/)")
+    report.append("[Premarket Gainers](https://www.tradingview.com/markets/stocks-usa/market-movers-pre-market-gainers/)")
+    report.append("[Unusual Volume](https://www.tradingview.com/markets/stocks-usa/market-movers-unusual-volume/)")
+    report.append("[Fear and Greed Index](https://www.cnn.com/markets/fear-and-greed)")
+    report.append("[Heat Map](https://www.tradingview.com/heatmap/stock/#%7B%22dataSource%22%3A%22SPX500%22%2C%22blockColor%22%3A%22change%22%2C%22blockSize%22%3A%22market_cap_basic%22%2C%22grouping%22%3A%22sector%22%7D)")
+    report.append("[Earnings Calendar](https://finance.yahoo.com/calendar/earnings?guccounter=1)")
 
-    report_lines.append(
-        "🚀 Premarket Gainers: <https://www.tradingview.com/markets/stocks-usa/market-movers-pre-market-gainers/>"
-    )
-
-    report_lines.append(
-        "📊 Unusual Volume: <https://www.tradingview.com/markets/stocks-usa/market-movers-unusual-volume/>"
-    )
-
-    report_lines.append(
-        "😨 Fear and Greed Index: <https://www.cnn.com/markets/fear-and-greed>"
-    )
-
-    report_lines.append(
-        "🗺️ Heat Map: <https://www.tradingview.com/heatmap/stock/#%7B%22dataSource%22%3A%22SPX500%22%2C%22blockColor%22%3A%22change%22%2C%22blockSize%22%3A%22market_cap_basic%22%2C%22grouping%22%3A%22sector%22%7D>"
-    )
-
-    report_lines.append(
-        "📅 Earnings Calendar: <https://finance.yahoo.com/calendar/earnings?guccounter=1>"
-    )
-
-    return "\n".join(report_lines)
+    return "\n".join(report)
 
 # -----------------------------
 # DISCORD BOT
@@ -159,7 +117,6 @@ async def main():
     report = await generate_spy_report()
 
     intents = discord.Intents.default()
-
     client = discord.Client(intents=intents)
 
     @client.event
@@ -169,10 +126,10 @@ async def main():
         channel = client.get_channel(CHANNEL_ID)
 
         if channel:
-            await channel.send(report)
-            print("✅ Report sent successfully")
+            await channel.send(report, suppress_embeds=True)
+            print("✅ Sent report")
         else:
-            print("❌ Could not find Discord channel")
+            print("❌ Channel not found")
 
         await client.close()
 
