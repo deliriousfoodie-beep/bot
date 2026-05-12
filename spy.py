@@ -63,26 +63,22 @@ def get_fear_greed():
         return f"❌ Fear & Greed error: {e}"
 
 # -----------------------------
-# MARKET REGIME (SAFE)
+# MARKET REGIME
 # -----------------------------
 def get_market_regime():
     try:
-        spy_df = yf.download("SPY", period="6mo", interval="1d", progress=False)
-        vix_df = yf.download("^VIX", period="1mo", interval="1d", progress=False)
-        dxy_df = yf.download("DX-Y.NYB", period="1mo", interval="1d", progress=False)
+        spy = yf.download("SPY", period="6mo", interval="1d", progress=False)
+        vix = yf.download("^VIX", period="1mo", interval="1d", progress=False)
+        dxy = yf.download("DX-Y.NYB", period="1mo", interval="1d", progress=False)
 
-        if spy_df.empty or vix_df.empty or dxy_df.empty:
+        if spy.empty or vix.empty or dxy.empty:
             return "🟡 Market Regime: DATA UNAVAILABLE"
 
-        spy = spy_df["Close"]
-        vix = vix_df["Close"]
-        dxy = dxy_df["Close"]
+        price = float(spy["Close"].iloc[-1])
+        trend = float(spy["Close"].ewm(span=50).mean().iloc[-1])
 
-        price = float(spy.iloc[-1])
-        trend = float(spy.ewm(span=50).mean().iloc[-1])
-
-        vix_val = float(vix.iloc[-1])
-        dxy_val = float(dxy.iloc[-1])
+        vix_val = float(vix["Close"].iloc[-1])
+        dxy_val = float(dxy["Close"].iloc[-1])
 
         score = 0
 
@@ -96,7 +92,7 @@ def get_market_regime():
         elif vix_val > 25:
             score -= 1
 
-        if dxy_val < float(dxy.rolling(20).mean().iloc[-1]):
+        if dxy_val < float(dxy["Close"].rolling(20).mean().iloc[-1]):
             score += 1
         else:
             score -= 1
@@ -123,7 +119,7 @@ def get_sector_leaders():
         for ticker, name in SECTORS.items():
             df = yf.download(ticker, period="6d", interval="1d", progress=False)
 
-            if df.empty or "Close" not in df:
+            if df.empty:
                 continue
 
             close = df["Close"]
@@ -131,10 +127,7 @@ def get_sector_leaders():
             if len(close) < 2:
                 continue
 
-            start = float(close.iloc[0])
-            end = float(close.iloc[-1])
-
-            change = ((end - start) / start) * 100
+            change = ((float(close.iloc[-1]) - float(close.iloc[0])) / float(close.iloc[0])) * 100
             results.append((name, change))
 
         if not results:
@@ -164,42 +157,35 @@ async def generate_report():
             return "❌ SPY data unavailable"
 
         close = data["Close"]
-
         price = float(close.iloc[-1])
 
         report = [
             f"📊 SPY Market Dashboard (${price:.2f})"
         ]
 
-        # -----------------------------
-        # EMA SECTION (FIXED)
-        # -----------------------------
+        # EMA
         for p in EMA_PERIODS:
-            ema_series = close.ewm(span=p).mean()
+            ema = float(close.ewm(span=p).mean().iloc[-1])
+            status = "🟢 ABOVE" if price > ema else "🔴 BELOW"
+            report.append(f"{status} {p} EMA: ${ema:.2f}")
 
-            ema_value = float(ema_series.iloc[-1])
-            price_value = float(price)
-
-            status = "🟢 ABOVE" if price_value > ema_value else "🔴 BELOW"
-
-            report.append(f"{status} {p} EMA: ${ema_value:.2f}")
-
-        # -----------------------------
-        # EXTRA DATA
-        # -----------------------------
         report.append("")
         report.append(get_fear_greed())
         report.append(get_market_regime())
         report.append(get_sector_leaders())
 
         # -----------------------------
-        # LINKS
+        # LINKS (RESTORED FULL SET)
         # -----------------------------
         report.append("\n🔗 Market Links")
+
         report.append("[Top Gainers](https://www.tradingview.com/markets/stocks-usa/market-movers-gainers/)")
         report.append("[Premarket Gainers](https://www.tradingview.com/markets/stocks-usa/market-movers-pre-market-gainers/)")
         report.append("[Unusual Volume](https://www.tradingview.com/markets/stocks-usa/market-movers-unusual-volume/)")
-
+        report.append("[Heat Map](https://www.tradingview.com/heatmap/stock/#%7B%22dataSource%22%3A%22SPX500%22%7D)")
+        report.append("[Earnings Calendar](https://finance.yahoo.com/calendar/earnings?guccounter=1)")
+        report.append("[Fear and Greed Index](https://www.cnn.com/markets/fear-and-greed)")
+        
         return "\n".join(report)
 
     except Exception as e:
@@ -216,14 +202,8 @@ async def main():
     @client.event
     async def on_ready():
         try:
-            print(f"Logged in as {client.user}")
-
             channel = await client.fetch_channel(CHANNEL_ID)
-
             await channel.send(report, suppress_embeds=True)
-
-            print("Report sent successfully")
-
         except Exception as e:
             print(f"Discord error: {e}")
 
