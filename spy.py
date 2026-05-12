@@ -180,7 +180,6 @@ async def generate_report():
         report.append("\n🔗 Market Links")
 
         report.append("[Top Gainers](https://www.tradingview.com/markets/stocks-usa/market-movers-gainers/)")
-        report.append("[Premarket Gainers](https://www.tradingview.com/markets/stocks-usa/market-movers-pre-market-gainers/)")
         report.append("[Unusual Volume](https://www.tradingview.com/markets/stocks-usa/market-movers-unusual-volume/)")
         report.append("[Heat Map](https://www.tradingview.com/heatmap/stock/#%7B%22dataSource%22%3A%22SPX500%22%7D)")
         report.append("[Earnings Calendar](https://finance.yahoo.com/calendar/earnings?guccounter=1)")
