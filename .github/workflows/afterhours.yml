@@ -30,4 +30,3 @@ jobs:
           CHANNEL_ID: ${{ secrets.CHANNEL_ID }}
         run: |
           python afterhours.py
-          python afterhoursactive.py
