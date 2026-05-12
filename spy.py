@@ -17,7 +17,7 @@ TOKEN = os.getenv("DISCORD_TOKEN")
 CHANNEL_ID = int(os.getenv("CHANNEL_ID"))
 
 # -----------------------------
-# SECTOR MAP (tickers → names)
+# SECTORS (ticker → name)
 # -----------------------------
 SECTORS = {
     "XLK": "Technology",
@@ -46,7 +46,7 @@ def get_fear_greed():
         value = next((int(m) for m in matches if 0 <= int(m) <= 100), None)
 
         if value is None:
-            return "❌ Fear & Greed not found"
+            return "❌ Fear & Greed unavailable"
 
         if value <= 24:
             return f"🔴 Fear & Greed: {value} (Extreme Fear)"
@@ -63,22 +63,79 @@ def get_fear_greed():
         return f"❌ Fear & Greed error: {e}"
 
 # -----------------------------
-# SECTOR PERFORMANCE
+# MARKET REGIME ENGINE (SAFE)
+# -----------------------------
+def get_market_regime():
+    try:
+        spy_df = yf.download("SPY", period="6mo", interval="1d", progress=False)
+        vix_df = yf.download("^VIX", period="1mo", interval="1d", progress=False)
+        dxy_df = yf.download("DX-Y.NYB", period="1mo", interval="1d", progress=False)
+
+        if spy_df.empty or vix_df.empty or dxy_df.empty:
+            return "🟡 Market Regime: DATA UNAVAILABLE"
+
+        spy = spy_df["Close"]
+        vix = vix_df["Close"]
+        dxy = dxy_df["Close"]
+
+        price = float(spy.iloc[-1])
+        trend = float(spy.ewm(span=50).mean().iloc[-1])
+
+        vix_val = float(vix.iloc[-1])
+        dxy_val = float(dxy.iloc[-1])
+
+        score = 0
+
+        if price > trend:
+            score += 1
+        else:
+            score -= 1
+
+        if vix_val < 18:
+            score += 1
+        elif vix_val > 25:
+            score -= 1
+
+        if dxy_val < float(dxy.rolling(20).mean().iloc[-1]):
+            score += 1
+        else:
+            score -= 1
+
+        if score >= 2:
+            return "🟢 Market Regime: RISK-ON"
+        elif score == 1:
+            return "🟡 Market Regime: NEUTRAL"
+        elif score == 0:
+            return "🟠 Market Regime: MIXED / ROTATION"
+        else:
+            return "🔴 Market Regime: RISK-OFF"
+
+    except Exception as e:
+        return f"❌ Market Regime error: {e}"
+
+# -----------------------------
+# SECTOR LEADERS (SAFE)
 # -----------------------------
 def get_sector_leaders():
     try:
         results = []
 
         for ticker, name in SECTORS.items():
-            data = yf.download(ticker, period="6d", interval="1d", progress=False)
+            df = yf.download(ticker, period="6d", interval="1d", progress=False)
 
-            if data.empty:
+            if df.empty or "Close" not in df:
                 continue
 
-            close = data["Close"]
-            change = ((close.iloc[-1] - close.iloc[0]) / close.iloc[0]) * 100
+            close = df["Close"]
 
+            if len(close) < 2:
+                continue
+
+            change = ((close.iloc[-1] - close.iloc[0]) / close.iloc[0]) * 100
             results.append((name, change))
+
+        if not results:
+            return "❌ Sector data unavailable"
 
         results.sort(key=lambda x: x[1], reverse=True)
 
@@ -94,57 +151,13 @@ def get_sector_leaders():
         return f"❌ Sector error: {e}"
 
 # -----------------------------
-# MARKET REGIME ENGINE
-# -----------------------------
-def get_market_regime():
-    try:
-        spy = yf.download("SPY", period="6mo", interval="1d", progress=False)["Close"]
-        vix = yf.download("^VIX", period="1mo", interval="1d", progress=False)["Close"]
-        dxy = yf.download("DX-Y.NYB", period="1mo", interval="1d", progress=False)["Close"]
-
-        spy_trend = spy.ewm(span=50).mean().iloc[-1]
-        price = spy.iloc[-1]
-
-        vix_val = vix.iloc[-1]
-        dxy_val = dxy.iloc[-1]
-
-        score = 0
-
-        # SPY trend
-        if price > spy_trend:
-            score += 1
-        else:
-            score -= 1
-
-        # VIX
-        if vix_val < 18:
-            score += 1
-        elif vix_val > 25:
-            score -= 1
-
-        # DXY (simple proxy)
-        if dxy_val < dxy.rolling(20).mean().iloc[-1]:
-            score += 1
-        else:
-            score -= 1
-
-        if score >= 2:
-            return "🟢 Market Regime: RISK-ON"
-        elif score == 1:
-            return "🟡 Market Regime: NEUTRAL"
-        elif score == 0:
-            return "🟠 Market Regime: MIXED / ROTATION"
-        else:
-            return "🔴 Market Regime: RISK-OFF"
-
-    except Exception as e:
-        return f"❌ Regime error: {e}"
-
-# -----------------------------
 # MAIN REPORT
 # -----------------------------
 async def generate_report():
     data = yf.download(TICKER, period="2y", interval="1d", progress=False)
+
+    if data.empty:
+        return "❌ SPY data unavailable"
 
     close = data["Close"]
     price = float(close.iloc[-1])
@@ -171,7 +184,7 @@ async def generate_report():
     return "\n".join(report)
 
 # -----------------------------
-# DISCORD
+# DISCORD BOT
 # -----------------------------
 async def main():
     report = await generate_report()
