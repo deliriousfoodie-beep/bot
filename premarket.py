@@ -21,6 +21,8 @@ async def generate_report():
 
         report.append(
             "[Premarket Gainers](https://www.tradingview.com/markets/stocks-usa/market-movers-pre-market-gainers/)"
+            "[Premarket Most Active](https://www.tradingview.com/markets/stocks-usa/market-movers-active-pre-market-stocks/)"
+            "[Premarket Gap](https://www.tradingview.com/markets/stocks-usa/market-movers-pre-market-gappers/)"
         )
 
         return "\n".join(report)
