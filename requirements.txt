@@ -3,3 +3,4 @@ pandas
 discord.py
 requests
 beautifulsoup4
+playwright
