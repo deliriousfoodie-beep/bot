@@ -1,10 +1,10 @@
 name: Run Trading Bot
 
-on:
+#on:
   #schedule:
     # 13:31 UTC is 6:31 AM PST
     #- cron: '31 13 * * 1-5'
-  workflow_dispatch:
+  #workflow_dispatch:
 
 jobs:
   build:
