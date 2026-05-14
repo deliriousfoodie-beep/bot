@@ -1,10 +1,10 @@
 name: AIRS Trend Status
 
-on:
-  schedule:
+#on:
+  #schedule:
     # 13:40 UTC is 6:40 AM PST
-    - cron: '40 13 * * 1-5'
-  workflow_dispatch:
+    #- cron: '40 13 * * 1-5'
+ # workflow_dispatch:
 
 jobs:
   report:
