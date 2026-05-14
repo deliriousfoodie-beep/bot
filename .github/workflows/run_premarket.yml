@@ -1,7 +1,7 @@
 name: Run Premarket Bot
 
-on:
-  workflow_dispatch:
+#on:
+  #workflow_dispatch:
   #schedule:
     #- cron: "15 13 * * 1-5"
 
