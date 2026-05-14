@@ -1,10 +1,10 @@
 name: Run After Hours Bot
 
-on:
+#on:
   #schedule:
     # 21:00 UTC is 2:00 PM PST
     #- cron: '0 21 * * 1-5'
-  workflow_dispatch:
+  #workflow_dispatch:
 
 jobs:
   build:
